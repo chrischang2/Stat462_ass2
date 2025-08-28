@@ -1,5 +1,5 @@
 ---
-title: "stat462 ass2"
+title: "stat462 assignment 2"
 author: "Chris Chang"
 date: "2025-08-27"
 output: pdf_document

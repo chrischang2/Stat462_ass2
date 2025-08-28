@@ -11,10 +11,13 @@ library(ggplot2)
 library(caret)
 library(knitr)
 ```
-#Part A
+
+# Part A
+In this question you are going to training a logistic regression for automatic classification of two types of pumpkin seeds, Çerçevelik and Ürgüp Sivrisi, based on geometric (measured) features of these seeds.
+
+
 ## Q1
-Load the datasets seeds_training.csv and seeds_test.csv. 
-Since the class labels (the seed types) contain characters that R struggles with, encode the class features as a factor variable in both training and test set.
+Load the datasets seeds_training.csv and seeds_test.csv. Since the class labels (the seed types) contain characters that R struggles with, encode the class features as a factor variable in both training and test set.
 
 ```{r}
 # Load the datasets
@@ -41,7 +44,7 @@ contrasts(seeds_train$Class)
 cat("\nClass levels:", levels(seeds_train$Class), "\n")
 ```
 
-## Q2 
+## Q2
 Fit a multiple logistic regression classifier using all of the features and record its accuracy on the test set.
 
 ```{r}
@@ -63,18 +66,19 @@ cat("Test set accuracy (full model):", round(logreg_all_acc, 4), "\n")
 ```
 
 ## Q3
-Provide a confusion matrix for your model based on its predictions on the test set. 
-Why does the concept of sensitivity and specificity not make a lot of sense here?
+Provide a confusion matrix for your model based on its predictions on the test set. Why does the concept of sensitivity and specificity not make a lot of sense here?
 
 ```{r}
 # Create confusion matrix
 logreg_full_confusion <- confusionMatrix(logreg_all_test_classify, seeds_test$Class)
 print(logreg_full_confusion)
 ```
+
 Sensitivity and specificity are most meaningful when there's a clear distinction between positive and negative cases, often in medical or diagnostic contexts where one outcome is considered more critical than the other. In our seed classification problem, neither Çerçevelik nor Ürgüp Sivrisi represents a "positive" or "negative" case - they are simply two different types of seeds with equal importance. The concepts of sensitivity (true positive rate) and specificity (true negative rate) are less interpretable when both classes are of equal interest and there's no inherent ordering or clinical significance to the classification.
 
 ## Q4
 Consulting the summary of your glm model, which three features are most significant?
+
 ```{r}
 # Extract coefficients and p-values
 model_summary <- summary(logreg_all)
@@ -99,8 +103,9 @@ print(coefficients_df[1:3, c("Estimate", "P_value")])
 top_features <- coefficients_df$Feature[1:3]
 print(top_features)
 ```
+
 ## Q5 a)
-Train another glm model, but this time using only the three most significant features from your first model run. 
+Train another glm model, but this time using only the three most significant features from your first model run.
 
 ```{r}
 # Fit sparse model
@@ -112,8 +117,7 @@ summary(logreg_sparse)
 ```
 
 ## Q5 b)
-Compute test set accuracy and a confusion matrix in the same way as for your first model and briefly compare the two models. 
-Which model would you pick, and why?
+Compute test set accuracy and a confusion matrix in the same way as for your first model and briefly compare the two models. Which model would you pick, and why?
 
 ```{r}
 # Make predictions on test set
@@ -132,6 +136,7 @@ cat("Confusion Matrix for sparse logistic regression model:", "\n")
 logreg_sparse_confusion <- confusionMatrix(logreg_sparse_test_classify, seeds_test$Class)
 print(logreg_sparse_confusion)
 ```
+
 ```{r}
 # Compare the two models
 cat("\n=== MODEL COMPARISON ===\n")
@@ -151,6 +156,111 @@ cat("\nModel Complexity Comparison:\n")
 cat("Full Model AIC:", round(logreg_all$aic, 2), "\n")
 cat("Sparse Model AIC:", round(logreg_sparse$aic, 2), "\n")
 ```
+
+# Part B
+Colors can be coded via their RGB (red, green, blue) value in the form (r,g,b), where r, g, and b are integers between 0 and 255. For example, (255,0,0) is pure red, and (128,200,128) is a shade of green.  
+
+In this exercise we will map (r,g,b) values to their color names. For example, we want (255,0,0) to be classified as red.  
+
+To make things a bit easier, we focus on the part of colour space where g=0, i.e. there is no green component. This means the feature space is all combinations (r,0,b), where r and b are between 0 and 255. For orientation, here is a visualisation of some of these colors, with each circle having the 3 color of its r-b-coordinate. We can clearly see that the coordinate (255,0,0) corresponds to bright red. Our goal is to create a classification algorithm that takes an r value, and a b value, and outputs the name of the color this corresponds to.  
+Thankfully, we have a dataset where some of these labels have been entered.
+
+## Q1
+Load the dataset colors_train.csv. How many classes are there in the dataset?
+
+```{r}
+# Load the color training dataset
+colors_train <- read.csv("colors_train.csv")
+colors_test <- read.csv("colors_test.csv")
+
+# Display basic information about the dataset
+cat("Color training dataset dimensions:", dim(colors_train), "\n")
+cat("Column names:", names(colors_train), "\n")
+
+# Check how many classes are in the dataset
+unique_colors <- unique(colors_train$color)
+cat("\nNumber of classes:", length(unique_colors), "\n")
+cat("Color classes:", paste(unique_colors, collapse = ", "), "\n")
+
+# Check class distribution
+cat("\nClass distribution:\n")
+table(colors_train$color)
+
+# Convert color to factor
+colors_train$color <- as.factor(colors_train$color)
+colors_test$color <- as.factor(colors_test$color)
+
+```
+## Q2
+Fit a QDA algorithm to this classification problem and compute the confusion matrix.
+
+```{r, echo = FALSE}
+library(MASS)
+
+# Fit QDA model
+qda_model <- qda(color ~ ., data = colors_train)
+
+# # Display model summary
+# print(qda_model)
+
+# Make predictions on training data (for confusion matrix)
+qda_test_pred <- predict(qda_model, colors_test)
+qda_test_classify <- qda_test_pred$class
+
+# Create confusion matrix
+qda_confusion <- confusionMatrix(qda_test_classify, colors_test$color)
+print(qda_confusion)
+```
+
+## Q3
+Visualise the decision boundaries in a suitable way
+
+```{r}
+library(ggplot2)
+
+# Create a grid of points to visualize decision boundaries
+r_seq <- seq(0, 255, length.out = 100)
+b_seq <- seq(0, 255, length.out = 100)
+grid <- expand.grid(r = r_seq, b = b_seq)
+
+# Predict colors for the grid
+grid_pred <- predict(qda_model, grid)
+grid$predicted_color <- grid_pred$class
+
+# Create the decision boundary plot
+p1 <- ggplot() +
+  geom_point(data = grid, aes(x = r, y = b, color = predicted_color), 
+             size = 0.5, alpha = 0.6) +
+  geom_point(data = colors_train, aes(x = r, y = b, color = color), 
+             size = 2, alpha = 0.8, shape = 21, fill = "white", stroke = 1.5) +
+  scale_color_manual(values = c("blue" = "blue", "brown" = "brown",
+                               "pink" = "pink", "purple" = "purple", "red" = "red")) +
+  labs(title = "QDA Decision Boundaries for Color Classification",
+       subtitle = "Large circles with white centers = training data, small dots = predicted regions",
+       x = "Red component (r)", 
+       y = "Blue component (b)",
+       color = "Predicted Color") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+print(p1)
+```
+
+## Q4
+Test your algorithm on (200,0,200). What colour is this being called by your algorithm?
+
+```{r}
+# Test the algorithm on the specific point (200, 0, 200)
+test_point <- data.frame(r = 200, b = 200)
+
+# Make prediction
+test_pred <- predict(qda_model, test_point)
+predicted_color <- test_pred$class
+
+cat("Prediction for point (200, 0, 200):\n")
+cat("Predicted color:", as.character(predicted_color), "\n")
+```
+
 
 
 

@@ -1,0 +1,157 @@
+---
+title: "stat462 ass2"
+author: "Chris Chang"
+date: "2025-08-27"
+output: pdf_document
+---
+
+```{r, knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)}
+library(dplyr)
+library(ggplot2)
+library(caret)
+library(knitr)
+```
+#Part A
+## Q1
+Load the datasets seeds_training.csv and seeds_test.csv. 
+Since the class labels (the seed types) contain characters that R struggles with, encode the class features as a factor variable in both training and test set.
+
+```{r}
+# Load the datasets
+seeds_train <- read.csv("seeds_training.csv")
+seeds_test <- read.csv("seeds_test.csv")
+
+# Display basic information about the datasets
+cat("Training dataset dimensions:", dim(seeds_train), "\n")
+cat("Test dataset dimensions:", dim(seeds_test), "\n")
+cat("Features:", names(seeds_train)[1:12], "\n")
+
+# Check the class distribution
+cat("\nClass distribution in training set:\n")
+table(seeds_train$Class)
+
+# Encode class features as factor variables
+seeds_train$Class <- as.factor(seeds_train$Class)
+seeds_test$Class <- as.factor(seeds_test$Class)
+
+# Check which class R treats as 1
+contrasts(seeds_train$Class)
+
+# Display the levels to confirm encoding
+cat("\nClass levels:", levels(seeds_train$Class), "\n")
+```
+
+## Q2 
+Fit a multiple logistic regression classifier using all of the features and record its accuracy on the test set.
+
+```{r}
+# Fit logistic regression using all features
+logreg_all <- glm(Class ~ ., data = seeds_train, family = binomial)
+
+# Display model summary
+summary(logreg_all)
+
+# Make predictions on test set
+logreg_all_test_pred <- predict(logreg_all, seeds_test, type = "response")
+logreg_all_test_classify <- ifelse(logreg_all_test_pred > 0.5, 
+                                         "Urgup Sivrisi", "Cercevelik")
+logreg_all_test_classify <- as.factor(logreg_all_test_classify)
+
+# Calculate test set accuracy
+logreg_all_acc <- mean(logreg_all_test_classify == seeds_test$Class)
+cat("Test set accuracy (full model):", round(logreg_all_acc, 4), "\n")
+```
+
+## Q3
+Provide a confusion matrix for your model based on its predictions on the test set. 
+Why does the concept of sensitivity and specificity not make a lot of sense here?
+
+```{r}
+# Create confusion matrix
+logreg_full_confusion <- confusionMatrix(logreg_all_test_classify, seeds_test$Class)
+print(logreg_full_confusion)
+```
+Sensitivity and specificity are most meaningful when there's a clear distinction between positive and negative cases, often in medical or diagnostic contexts where one outcome is considered more critical than the other. In our seed classification problem, neither Çerçevelik nor Ürgüp Sivrisi represents a "positive" or "negative" case - they are simply two different types of seeds with equal importance. The concepts of sensitivity (true positive rate) and specificity (true negative rate) are less interpretable when both classes are of equal interest and there's no inherent ordering or clinical significance to the classification.
+
+## Q4
+Consulting the summary of your glm model, which three features are most significant?
+```{r}
+# Extract coefficients and p-values
+model_summary <- summary(logreg_all)
+coefficients_df <- data.frame(
+  Feature = rownames(model_summary$coefficients),
+  Estimate = model_summary$coefficients[, 1],
+  Std_Error = model_summary$coefficients[, 2],
+  Z_value = model_summary$coefficients[, 3],
+  P_value = model_summary$coefficients[, 4]
+)
+
+print(model_summary)
+
+# Remove intercept and sort by p-value
+coefficients_df <- coefficients_df[-1, ]  # Remove intercept
+coefficients_df <- coefficients_df[order(coefficients_df$P_value), ]
+
+cat("Three most significant features based on p-values:\n")
+print(coefficients_df[1:3, c("Estimate", "P_value")])
+
+# Store the three most significant features
+top_features <- coefficients_df$Feature[1:3]
+print(top_features)
+```
+## Q5 a)
+Train another glm model, but this time using only the three most significant features from your first model run. 
+
+```{r}
+# Fit sparse model
+logreg_sparse <- glm(Class ~ Equiv_Diameter + Minor_Axis_Length + Area, 
+                     data = seeds_train, family = binomial)
+
+# Display model summary
+summary(logreg_sparse)
+```
+
+## Q5 b)
+Compute test set accuracy and a confusion matrix in the same way as for your first model and briefly compare the two models. 
+Which model would you pick, and why?
+
+```{r}
+# Make predictions on test set
+logreg_sparse_test_pred <- predict(logreg_sparse, seeds_test, type = "response")
+logreg_sparse_test_classify <- ifelse(logreg_sparse_test_pred > 0.5, 
+                                       "Urgup Sivrisi", "Cercevelik")
+logreg_sparse_test_classify <- as.factor(logreg_sparse_test_classify)
+
+# Calculate test set accuracy
+logreg_sparse_acc <- mean(logreg_sparse_test_classify == seeds_test$Class)
+cat("Test set accuracy (sparse model):", round(logreg_sparse_acc, 4), "\n")
+cat("Test set accuracy (full model):", round(logreg_all_acc, 4), "\n", "\n", "\n")
+
+# Create confusion matrix
+cat("Confusion Matrix for sparse logistic regression model:", "\n")
+logreg_sparse_confusion <- confusionMatrix(logreg_sparse_test_classify, seeds_test$Class)
+print(logreg_sparse_confusion)
+```
+```{r}
+# Compare the two models
+cat("\n=== MODEL COMPARISON ===\n")
+cat("Full Model (12 features):\n")
+cat("  - Test Accuracy:", round(logreg_all_acc, 4), "\n")
+cat("  - Number of features:", 12, "\n")
+
+cat("\nSparse Model (3 features):\n")
+cat("  - Test Accuracy:", round(logreg_sparse_acc, 4), "\n")
+cat("  - Number of features:", 3, "\n")
+cat("  - Features used: Equiv_Diameter, Minor_Axis_Length, Area\n")
+
+cat("\nAccuracy difference:", round(logreg_all_acc - logreg_sparse_acc, 4), "\n")
+
+# Compare AIC values
+cat("\nModel Complexity Comparison:\n")
+cat("Full Model AIC:", round(logreg_all$aic, 2), "\n")
+cat("Sparse Model AIC:", round(logreg_sparse$aic, 2), "\n")
+```
+
+
+
+
